@@ -381,8 +381,6 @@ def main():
       else:
         load_ckpt(modules_optims, cfg.ckpt_file)
         print('cyp____test____load_ckpt\n')
-        if cfg.only_test:
-          TMO(modules_optims)
 
     for test_set, name in zip(test_sets, test_set_names):
       test_set.set_feat_func(ExtractFeature(model_w, TVT))
