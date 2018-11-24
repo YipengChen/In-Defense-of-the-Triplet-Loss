@@ -400,7 +400,7 @@ def main():
     return mAP, cmc_scores[0]
 
   if cfg.only_test:
-    test(load_model_weight=True)
+    test(load_model_weight=False)
     return
 
   ############
