@@ -6,7 +6,7 @@ python script/experiment/train.py \
 --last_conv_stride 2 \
 --normalize_feature false \
 --exp_dir ./exp_dir/20181123_market1501_trainval_stride2_default \
---model_weight_file ./exp_dir/20181123_market1501_trainval_stride2_default/ckpt.pth   
+--model_weight_file ckpt.pth   
 
 python script/experiment/train.py \
 -d '(0,)' \
