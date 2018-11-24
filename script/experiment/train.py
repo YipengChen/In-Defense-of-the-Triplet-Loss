@@ -407,12 +407,12 @@ def main():
 	
 	##### save top 100 CMC rank 
     if not mq_mAP is None:
-      scio.savemat(cfg.exp_dir+'CMC'+'.mat', {'mAP':mAP,'cmc_scores':cmc_scores,
+      scio.savemat(cfg.exp_dir+'/CMC'+'.mat', {'mAP':mAP,'cmc_scores':cmc_scores,
                                                        'mq_mAP':mq_mAP,'mq_cmc_scores':mq_cmc_scores,
                                                        're_mAP':re_mAP,'re_cmc_scores':re_cmc_scores,
                                                        're_mq_mAP':re_mq_mAP,'re_mq_cmc_scores':re_mq_cmc_scores})
     else:
-      scio.savemat(cfg.exp_dir+'CMC'+'.mat', {'mAP':mAP,'cmc_scores':cmc_scores,
+      scio.savemat(cfg.exp_dir+'/CMC'+'.mat', {'mAP':mAP,'cmc_scores':cmc_scores,
                                                        're_mAP':re_mAP,'re_cmc_scores':re_cmc_scores})
     return
 
