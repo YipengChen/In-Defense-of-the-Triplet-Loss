@@ -35,6 +35,8 @@ from tri_loss.utils.utils import set_seed
 from tri_loss.utils.utils import adjust_lr_exp
 from tri_loss.utils.utils import adjust_lr_staircase
 
+import scipy.io as scio
+
 
 class Config(object):
   def __init__(self):
@@ -385,10 +387,10 @@ def main():
     for test_set, name in zip(test_sets, test_set_names):
       test_set.set_feat_func(ExtractFeature(model_w, TVT))
       print('\n=========> Test on dataset: {} <=========\n'.format(name))
-      test_set.eval(
-        normalize_feat=cfg.normalize_feature,
-        verbose=True)
-
+      mAP, cmc_scores, mq_mAP, mq_cmc_scores, re_mAP, re_cmc_scores, re_mq_mAP, re_mq_cmc_scores = test_set.eval(
+        normalize_feat=cfg.normalize_feature,to_re_rank=False,verbose=True,SingleQuery=True,MultiQuery=False)
+    return mAP, cmc_scores, mq_mAP, mq_cmc_scores, re_mAP, re_cmc_scores, re_mq_mAP, re_mq_cmc_scores
+													   
   def validate():
     if val_set.extract_feat_func is None:
       val_set.set_feat_func(ExtractFeature(model_w, TVT))
@@ -401,7 +403,17 @@ def main():
     return mAP, cmc_scores[0]
 
   if cfg.only_test:
-    test(load_model_weight=True)
+    mAP, cmc_scores, mq_mAP, mq_cmc_scores, re_mAP, re_cmc_scores, re_mq_mAP, re_mq_cmc_scores = test(load_model_weight=True)
+	
+	##### save top 100 CMC rank 
+    if not mq_mAP is None:
+      scio.savemat(cfg.exp_dir+'CMC'+'.mat', {'mAP':mAP,'cmc_scores':cmc_scores,
+                                                       'mq_mAP':mq_mAP,'mq_cmc_scores':mq_cmc_scores,
+                                                       're_mAP':re_mAP,'re_cmc_scores':re_cmc_scores,
+                                                       're_mq_mAP':re_mq_mAP,'re_mq_cmc_scores':re_mq_cmc_scores})
+    else:
+      scio.savemat(cfg.exp_dir+'CMC'+'.mat', {'mAP':mAP,'cmc_scores':cmc_scores,
+                                                       're_mAP':re_mAP,'re_cmc_scores':re_cmc_scores})
     return
 
   ############

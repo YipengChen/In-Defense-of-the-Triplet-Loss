@@ -133,9 +133,7 @@ class TestSet(Dataset):
       normalize_feat=True,
       to_re_rank=True,
       pool_type='average',
-      verbose=True,
-      SingleQuery=True,
-      MultiQuery=False):
+      verbose=True):
 
     """Evaluate using metric CMC and mAP.
     Args:
@@ -174,7 +172,7 @@ class TestSet(Dataset):
         separate_camera_set=self.separate_camera_set,
         single_gallery_shot=self.single_gallery_shot,
         first_match_break=self.first_match_break,
-        topk=100)
+        topk=10)
       return mAP, cmc_scores
 
     def print_scores(mAP, cmc_scores):
@@ -184,101 +182,96 @@ class TestSet(Dataset):
     ################
     # Single Query #
     ################
-    mAP, cmc_scores = None, None
-    if SingleQuery:
-      with measure_time('Computing distance...', verbose=verbose):
-        # query-gallery distance
-        q_g_dist = compute_dist(feat[q_inds], feat[g_inds], type='euclidean')
 
-      with measure_time('Computing scores...', verbose=verbose):
-        mAP, cmc_scores = compute_score(q_g_dist)
+    with measure_time('Computing distance...', verbose=verbose):
+      # query-gallery distance
+      q_g_dist = compute_dist(feat[q_inds], feat[g_inds], type='euclidean')
 
-      print('{:<30}'.format('Single Query:'), end='')
-      print_scores(mAP, cmc_scores)
+    with measure_time('Computing scores...', verbose=verbose):
+      mAP, cmc_scores = compute_score(q_g_dist)
+
+    print('{:<30}'.format('Single Query:'), end='')
+    print_scores(mAP, cmc_scores)
 
     ###############
     # Multi Query #
     ###############
 
     mq_mAP, mq_cmc_scores = None, None
-    if MultiQuery:
+    if any(mq_inds):
+      mq_ids = ids[mq_inds]
+      mq_cams = cams[mq_inds]
+      mq_feat = feat[mq_inds]
+      unique_mq_ids_cams = defaultdict(list)
+      for ind, (id, cam) in enumerate(zip(mq_ids, mq_cams)):
+        unique_mq_ids_cams[(id, cam)].append(ind)
+      keys = unique_mq_ids_cams.keys()
+      assert pool_type in ['average', 'max']
+      pool = np.mean if pool_type == 'average' else np.max
+      mq_feat = np.stack([pool(mq_feat[unique_mq_ids_cams[k]], axis=0)
+                          for k in keys])
+
+      with measure_time('Multi Query, Computing distance...', verbose=verbose):
+        # multi_query-gallery distance
+        mq_g_dist = compute_dist(mq_feat, feat[g_inds], type='euclidean')
+
+      with measure_time('Multi Query, Computing scores...', verbose=verbose):
+        mq_mAP, mq_cmc_scores = compute_score(
+          mq_g_dist,
+          query_ids=np.array(zip(*keys)[0]),
+          gallery_ids=ids[g_inds],
+          query_cams=np.array(zip(*keys)[1]),
+          gallery_cams=cams[g_inds]
+        )
+
+      print('{:<30}'.format('Multi Query:'), end='')
+      print_scores(mq_mAP, mq_cmc_scores)
+
+    if to_re_rank:
+
+      ##########################
+      # Re-ranked Single Query #
+      ##########################
+
+      with measure_time('Re-ranking distance...', verbose=verbose):
+        # query-query distance
+        q_q_dist = compute_dist(feat[q_inds], feat[q_inds], type='euclidean')
+        # gallery-gallery distance
+        g_g_dist = compute_dist(feat[g_inds], feat[g_inds], type='euclidean')
+        # re-ranked query-gallery distance
+        re_r_q_g_dist = re_ranking(q_g_dist, q_q_dist, g_g_dist)
+
+      with measure_time('Computing scores for re-ranked distance...',
+                        verbose=verbose):
+        mAP, cmc_scores = compute_score(re_r_q_g_dist)
+
+      print('{:<30}'.format('Re-ranked Single Query:'), end='')
+      print_scores(mAP, cmc_scores)
+
+      #########################
+      # Re-ranked Multi Query #
+      #########################
+
       if any(mq_inds):
-        mq_ids = ids[mq_inds]
-        mq_cams = cams[mq_inds]
-        mq_feat = feat[mq_inds]
-        unique_mq_ids_cams = defaultdict(list)
-        for ind, (id, cam) in enumerate(zip(mq_ids, mq_cams)):
-          unique_mq_ids_cams[(id, cam)].append(ind)
-        keys = unique_mq_ids_cams.keys()
-        assert pool_type in ['average', 'max']
-        pool = np.mean if pool_type == 'average' else np.max
-        mq_feat = np.stack([pool(mq_feat[unique_mq_ids_cams[k]], axis=0)
-                            for k in keys])
+        with measure_time('Multi Query, Re-ranking distance...',
+                          verbose=verbose):
+          # multi_query-multi_query distance
+          mq_mq_dist = compute_dist(mq_feat, mq_feat, type='euclidean')
+          # re-ranked multi_query-gallery distance
+          re_r_mq_g_dist = re_ranking(mq_g_dist, mq_mq_dist, g_g_dist)
 
-        with measure_time('Multi Query, Computing distance...', verbose=verbose):
-          # multi_query-gallery distance
-          mq_g_dist = compute_dist(mq_feat, feat[g_inds], type='euclidean')
-
-        with measure_time('Multi Query, Computing scores...', verbose=verbose):
+        with measure_time(
+            'Multi Query, Computing scores for re-ranked distance...',
+            verbose=verbose):
           mq_mAP, mq_cmc_scores = compute_score(
-            mq_g_dist,
+            re_r_mq_g_dist,
             query_ids=np.array(zip(*keys)[0]),
             gallery_ids=ids[g_inds],
             query_cams=np.array(zip(*keys)[1]),
             gallery_cams=cams[g_inds]
           )
 
-        print('{:<30}'.format('Multi Query:'), end='')
+        print('{:<30}'.format('Re-ranked Multi Query:'), end='')
         print_scores(mq_mAP, mq_cmc_scores)
 
-      
-    ##########################
-    # Re-ranked Single Query #
-    ##########################
-    re_mAP, re_cmc_scores = None, None
-    if to_re_rank:
-      if SingleQuery:
-        with measure_time('Re-ranking distance...', verbose=verbose):
-          # query-query distance
-          q_q_dist = compute_dist(feat[q_inds], feat[q_inds], type='euclidean')
-          # gallery-gallery distance
-          g_g_dist = compute_dist(feat[g_inds], feat[g_inds], type='euclidean')
-          # re-ranked query-gallery distance
-          re_r_q_g_dist = re_ranking(q_g_dist, q_q_dist, g_g_dist)
-
-        with measure_time('Computing scores for re-ranked distance...',
-                          verbose=verbose):
-          re_mAP, re_cmc_scores = compute_score(re_r_q_g_dist)
-
-        print('{:<30}'.format('Re-ranked Single Query:'), end='')
-        print_scores(re_mAP, re_cmc_scores)
-
-    #########################
-    # Re-ranked Multi Query #
-    #########################
-    re_mq_mAP, re_mq_cmc_scores = None, None
-    if to_re_rank:
-      if MultiQuery:
-        if any(mq_inds):
-          with measure_time('Multi Query, Re-ranking distance...',
-                            verbose=verbose):
-            # multi_query-multi_query distance
-            mq_mq_dist = compute_dist(mq_feat, mq_feat, type='euclidean')
-            # re-ranked multi_query-gallery distance
-            re_r_mq_g_dist = re_ranking(mq_g_dist, mq_mq_dist, g_g_dist)
-
-          with measure_time(
-              'Multi Query, Computing scores for re-ranked distance...',
-              verbose=verbose):
-            re_mq_mAP, re_mq_cmc_scores = compute_score(
-              re_r_mq_g_dist,
-              query_ids=np.array(zip(*keys)[0]),
-              gallery_ids=ids[g_inds],
-              query_cams=np.array(zip(*keys)[1]),
-              gallery_cams=cams[g_inds]
-            )
-
-          print('{:<30}'.format('Re-ranked Multi Query:'), end='')
-          print_scores(re_mq_mAP, re_mq_cmc_scores)
-    
-    return mAP, cmc_scores, mq_mAP, mq_cmc_scores, re_mAP, re_cmc_scores, re_mq_mAP, re_mq_cmc_scores
+    return mAP, cmc_scores, mq_mAP, mq_cmc_scores
