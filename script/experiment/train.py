@@ -388,7 +388,7 @@ def main():
       test_set.set_feat_func(ExtractFeature(model_w, TVT))
       print('\n=========> Test on dataset: {} <=========\n'.format(name))
       mAP, cmc_scores, mq_mAP, mq_cmc_scores, re_mAP, re_cmc_scores, re_mq_mAP, re_mq_cmc_scores = test_set.eval(
-        normalize_feat=cfg.normalize_feature,to_re_rank=False,verbose=True,SingleQuery=True,MultiQuery=False)
+        normalize_feat=cfg.normalize_feature,to_re_rank=True,verbose=True,SingleQuery=True,MultiQuery=False)
     return mAP, cmc_scores, mq_mAP, mq_cmc_scores, re_mAP, re_cmc_scores, re_mq_mAP, re_mq_cmc_scores
 													   
   def validate():
